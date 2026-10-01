@@ -109,9 +109,18 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
         throw Exception('Failed to resolve student portfolio profile.');
       }
 
-      final publicKey = DateTime.now().millisecondsSinceEpoch.toString();
       final portfolioId = resolvedPortfolioId;
+      String? sessionId;
+      try {
+        sessionId = await _service.fetchActiveSessionId(
+          portfolioId,
+          phase: phase,
+        );
+      } catch (_) {}
+      final publicKey =
+          sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
       final seatsFuture = _service.fetchRealtimeSections();
+
       List<AdvisingSectionRecord> enrolled = const [];
       String? enrolledError;
       try {
