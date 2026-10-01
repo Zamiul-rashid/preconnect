@@ -238,9 +238,15 @@ class _ClassScheduleState extends State<ClassSchedulePage>
     section.ClassSchedule? scrollSchedule;
     DateTime? scrollDateTime;
     final now = DateTime.now();
+    final seen = <String>{};
 
     for (final section in sections) {
       for (final classSchedule in section.sectionSchedule.classSchedules) {
+        final key =
+            '${section.courseCode}|${section.sectionName}|${classSchedule.day}|${classSchedule.startTime}|${classSchedule.endTime}|${section.roomNumber}';
+        if (!seen.add(key)) {
+          continue;
+        }
         grouped.putIfAbsent(classSchedule.day, () => []);
         grouped[classSchedule.day]!.add(
           _ScheduleRow.fromSection(section, classSchedule),
@@ -251,6 +257,8 @@ class _ClassScheduleState extends State<ClassSchedulePage>
             day: classSchedule.day,
             startTime: classSchedule.startTime,
             endTime: classSchedule.endTime,
+            startDate: section.sectionSchedule.classStartDate,
+            endDate: section.sectionSchedule.classEndDate,
             isRamadan: isRamadan,
             now: now,
           );
@@ -306,6 +314,8 @@ class _ClassScheduleState extends State<ClassSchedulePage>
     required String day,
     required String startTime,
     required String endTime,
+    String? startDate,
+    String? endDate,
     required bool isRamadan,
     required DateTime now,
   }) {
@@ -328,12 +338,27 @@ class _ClassScheduleState extends State<ClassSchedulePage>
     final endMinute = endParsed?.$2 ?? 0;
     final endMinutes = endHour * 60 + endMinute;
 
-    return nextWeeklyOccurrence(
+    var candidate = nextWeeklyOccurrence(
       weekday: targetWeekday,
       startMinutes: startMinutes,
       endMinutes: endMinutes,
       now: now,
     );
+
+    final s = AppTime.parseDate(startDate);
+    final e = AppTime.parseDate(endDate);
+    while (candidate != null &&
+        s != null &&
+        candidate.isBefore(DateTime(s.year, s.month, s.day))) {
+      candidate = candidate.add(const Duration(days: 7));
+    }
+    if (candidate != null &&
+        e != null &&
+        candidate.isAfter(DateTime(e.year, e.month, e.day, 23, 59, 59))) {
+      return null;
+    }
+
+    return candidate;
   }
 
   Future<void> _handleRefresh({bool notify = true}) async {
@@ -375,11 +400,21 @@ class _ClassScheduleState extends State<ClassSchedulePage>
       final dateStr = resolved.finalDate;
       if (dateStr != null && dateStr.isNotEmpty) {
         final dt = AppTime.parseDateTime(dateStr, resolved.finalStartTime);
-        if (dt != null) {
-          if (maxDate == null || dt.isAfter(maxDate)) {
-            maxDate = dt;
-          }
+        if (dt != null && (maxDate == null || dt.isAfter(maxDate))) {
+          maxDate = dt;
         }
+      }
+      final endDate = AppTime.parseDate(s.sectionSchedule.classEndDate);
+      if (endDate != null) {
+        final dt = DateTime(
+          endDate.year,
+          endDate.month,
+          endDate.day,
+          23,
+          59,
+          59,
+        );
+        if (maxDate == null || dt.isAfter(maxDate)) maxDate = dt;
       }
     }
     return maxDate;
@@ -404,8 +439,7 @@ class _ClassScheduleState extends State<ClassSchedulePage>
     final today = DateTime(now.year, now.month, now.day);
     final totalDays = _visibleWeekCount * 7;
     final sections = <_RenderedScheduleSection>[];
-
-    final cutoffDate = maxFinalExamDate != null
+    final cutoff = maxFinalExamDate != null
         ? DateTime(
             maxFinalExamDate.year,
             maxFinalExamDate.month,
@@ -418,11 +452,10 @@ class _ClassScheduleState extends State<ClassSchedulePage>
 
     for (var dayOffset = 0; dayOffset < totalDays; dayOffset++) {
       final date = today.add(Duration(days: dayOffset));
-      if (cutoffDate != null && date.isAfter(cutoffDate)) {
-        break;
-      }
+      if (cutoff != null && date.isAfter(cutoff)) break;
       final day = _weekdayNames[date.weekday - 1];
-      if (!grouped.containsKey(day)) continue;
+      final list = grouped[day];
+      if (list == null || !list.any((s) => s.isActiveOn(date))) continue;
       sections.add(
         _RenderedScheduleSection(
           day: day,
@@ -549,7 +582,8 @@ class _ClassScheduleState extends State<ClassSchedulePage>
               data?.examOverrides ?? const <String, ExamScheduleOverride>{};
           final scrollSchedule = data?.scrollSchedule;
           final scrollDateTime = data?.scrollDateTime;
-          final shouldHighlightCurrentSemester = isCurrentSemester;
+          final shouldHighlightCurrentSemester =
+              isCurrentSemester && !_showDoneSections;
           final isRamadan = data?.isRamadan ?? false;
           final finishedSectionKeys =
               CourseSectionExamFilter.finishedSectionKeys(
@@ -590,7 +624,8 @@ class _ClassScheduleState extends State<ClassSchedulePage>
             maxFinalExamDate: maxFinalExamDate,
           );
 
-          if (visibleGrouped.isEmpty) {
+          if (visibleGrouped.isEmpty ||
+              (shouldHighlightCurrentSemester && renderedSections.isEmpty)) {
             return buildRefreshEmptyState(
               onRefresh: _handleRefresh,
               message: _showDoneSections
@@ -601,6 +636,7 @@ class _ClassScheduleState extends State<ClassSchedulePage>
 
           final children = <Widget>[];
           final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
           final todayWeekday = _weekdayNames[now.weekday - 1];
           final hasClassesToday = visibleGrouped.containsKey(todayWeekday);
           final holidayStatus = isCurrentSemester
@@ -667,7 +703,10 @@ class _ClassScheduleState extends State<ClassSchedulePage>
           var cardIndex = 0;
           final totalCards = renderedSections.fold<int>(0, (sum, sectionInfo) {
             final daySchedules = visibleGrouped[sectionInfo.day] ?? const [];
-            return sum + daySchedules.length;
+            final dayDate = sectionInfo.date;
+            if (dayDate == null) return sum + daySchedules.length;
+            return sum +
+                daySchedules.where((s) => s.isActiveOn(dayDate)).length;
           });
           _highlightScroll.clearHighlightKey();
           for (var i = 0; i < renderedSections.length; i++) {
@@ -675,6 +714,12 @@ class _ClassScheduleState extends State<ClassSchedulePage>
             final day = sectionInfo.day;
             final schedules = visibleGrouped[day]!;
             final dayDate = sectionInfo.date;
+            final activeSchedules = dayDate != null
+                ? schedules
+                      .where((s) => s.isActiveOn(dayDate))
+                      .toList(growable: false)
+                : schedules;
+            if (activeSchedules.isEmpty) continue;
             final dayDateLabel = dayDate == null ? '' : formatLongDate(dayDate);
 
             children.add(
@@ -700,7 +745,7 @@ class _ClassScheduleState extends State<ClassSchedulePage>
                   const Gap(12),
                   ...(() {
                     final scheduleWidgets = <Widget>[];
-                    for (final entry in schedules) {
+                    for (final entry in activeSchedules) {
                       final s = entry.schedule;
                       final code = entry.courseCode;
                       final sectionName = entry.sectionName;
@@ -754,22 +799,28 @@ class _ClassScheduleState extends State<ClassSchedulePage>
             );
           }
 
-          final lastRenderedDate = renderedSections.isNotEmpty
-              ? renderedSections.last.date
-              : null;
-          final isPastFinalExamCutoff =
-              maxFinalExamDate != null &&
-              lastRenderedDate != null &&
-              !lastRenderedDate.isBefore(
-                DateTime(
+          final cutoff = maxFinalExamDate != null
+              ? DateTime(
                   maxFinalExamDate.year,
                   maxFinalExamDate.month,
                   maxFinalExamDate.day,
-                ),
-              );
+                  23,
+                  59,
+                  59,
+                )
+              : null;
+          final lastDate = renderedSections.isNotEmpty
+              ? renderedSections.last.date
+              : null;
           final canLoadMoreWeeks =
               shouldHighlightCurrentSemester &&
-              (maxFinalExamDate == null || !isPastFinalExamCutoff);
+              renderedSections.isNotEmpty &&
+              (cutoff == null ||
+                  (!now.isAfter(cutoff) &&
+                      !today
+                          .add(Duration(days: _visibleWeekCount * 7))
+                          .isAfter(cutoff) &&
+                      (lastDate == null || lastDate.isBefore(cutoff))));
 
           if (canLoadMoreWeeks) {
             children.add(
@@ -857,6 +908,8 @@ class _ScheduleRow {
     required this.capacity,
     required this.courseType,
     required this.semesterSessionId,
+    required this.startDate,
+    required this.endDate,
   });
 
   factory _ScheduleRow.fromSection(
@@ -873,6 +926,8 @@ class _ScheduleRow {
       capacity: value.capacity,
       courseType: value.courseType,
       semesterSessionId: value.semesterSessionId,
+      startDate: value.sectionSchedule.classStartDate,
+      endDate: value.sectionSchedule.classEndDate,
     );
   }
 
@@ -885,4 +940,19 @@ class _ScheduleRow {
   final int? capacity;
   final String courseType;
   final int semesterSessionId;
+  final String startDate;
+  final String endDate;
+
+  bool isActiveOn(DateTime date) {
+    final s = AppTime.parseDate(startDate);
+    final e = AppTime.parseDate(endDate);
+    if (s != null && date.isBefore(DateTime(s.year, s.month, s.day))) {
+      return false;
+    }
+    if (e != null &&
+        date.isAfter(DateTime(e.year, e.month, e.day, 23, 59, 59))) {
+      return false;
+    }
+    return true;
+  }
 }

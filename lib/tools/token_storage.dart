@@ -673,8 +673,7 @@ class PlatformPermissions {
 
 class AppLockService {
   static const String _prefsKey = 'app_lock_enabled';
-  static const String _timeoutKey = 'app_lock_timeout_seconds';
-  static const int defaultTimeoutSeconds = 60;
+  static const Duration timeout = Duration(minutes: 1);
   final LocalAuthentication _auth = LocalAuthentication();
 
   Future<bool> isEnabled() async {
@@ -683,33 +682,6 @@ class AppLockService {
 
   Future<void> setEnabled(bool value) async {
     await AppStorage.instance.setBool(_prefsKey, value);
-  }
-
-  Future<int> getTimeoutSeconds() async {
-    return await AppStorage.instance.getInt(_timeoutKey) ??
-        defaultTimeoutSeconds;
-  }
-
-  Future<void> setTimeoutSeconds(int value) async {
-    await AppStorage.instance.setInt(_timeoutKey, value);
-  }
-
-  static String timeoutLabel(int seconds) {
-    switch (seconds) {
-      case 0:
-        return 'Immediately';
-      case 30:
-        return '30 seconds';
-      case 60:
-        return '1 minute';
-      case 300:
-        return '5 minutes';
-      case 900:
-        return '15 minutes';
-      default:
-        if (seconds < 60) return '$seconds seconds';
-        return '${seconds ~/ 60} minutes';
-    }
   }
 
   Future<bool> authenticate({String reason = ''}) async {

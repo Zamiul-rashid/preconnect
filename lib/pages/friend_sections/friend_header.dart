@@ -146,39 +146,10 @@ class FriendAvatar extends StatelessWidget {
     return '${ApiConfig.connectCdnBase}/img/thumb/$encoded.jpg';
   }
 
-  Widget _buildFallback(BuildContext context) {
-    final trimmed = name.trim();
-    final initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '';
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppPalette.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(radius),
-      ),
-      alignment: Alignment.center,
-      child: initial.isNotEmpty
-          ? Text(
-              initial,
-              style: TextStyle(
-                fontSize: size * 0.42,
-                fontWeight: FontWeight.w700,
-                color: AppPalette.primary,
-              ),
-            )
-          : Icon(
-              Icons.person_rounded,
-              size: size * 0.55,
-              color: AppPalette.primary,
-            ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final resolvedPhotoUrl = _resolvePhotoUrl(photoUrl);
-    final fallback = _buildFallback(context);
-    if (resolvedPhotoUrl == null) return fallback;
+    if (resolvedPhotoUrl == null) return const SizedBox.shrink();
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: CachedImage(
@@ -186,8 +157,8 @@ class FriendAvatar extends StatelessWidget {
         fit: BoxFit.cover,
         width: size,
         height: size,
-        placeholder: fallback,
-        error: fallback,
+        placeholder: const SizedBox.shrink(),
+        error: const SizedBox.shrink(),
       ),
     );
   }

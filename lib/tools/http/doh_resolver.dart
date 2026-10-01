@@ -94,6 +94,8 @@ class DohResolver {
       'preconnect.app',
       'connect.bracu.ac.bd',
       'bracu.ac.bd',
+      'www.bracu.ac.bd',
+      'cse.bracu.ac.bd',
       'api.github.com',
     ];
     await Future.wait(domains.map((domain) => resolve(domain, client: client)));

@@ -18,9 +18,17 @@ class CourseSectionExamFilter {
       resolved.finalDate,
       resolved.finalEndTime ?? resolved.finalStartTime,
     );
-    if (finalDateTime == null) return false;
     final current = now ?? DateTime.now();
-    return !current.isBefore(finalDateTime);
+    if (finalDateTime != null) {
+      return !current.isBefore(finalDateTime);
+    }
+    final endDate = AppTime.parseDate(section.sectionSchedule.classEndDate);
+    if (endDate != null) {
+      return current.isAfter(
+        DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59),
+      );
+    }
+    return false;
   }
 
   static Set<String> finishedSectionKeys(

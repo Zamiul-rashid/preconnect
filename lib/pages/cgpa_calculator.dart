@@ -291,7 +291,7 @@ class _CgpaCalculatorPageState extends State<CgpaCalculatorPage> {
                 child: OutlinedButton.icon(
                   onPressed: _resetCurrentCourses,
                   icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Reset Current Courses'),
+                  label: const Text('Reset'),
                   style: appOutlinedButtonStyle(
                     context,
                     padding: const EdgeInsets.symmetric(

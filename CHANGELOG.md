@@ -5,6 +5,13 @@ Entries are written for students, not developers — plain language, no commit h
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-10-01
+
+- Class Schedule Accuracy: Enforced exact semester start and end dates across active routines, preventing courses from displaying before their official start date or after semester completion.
+- Schedule Navigation & Views: Eliminated duplicate course entries and cleaned up empty schedule states to avoid unnecessary Next Week prompts.
+- App Lock Security: Standardized app security with a consistent 1-minute background timeout for seamless re-authentication.
+- Network & Performance: Enhanced campus network resolution and optimized faculty visual assets for fast, smooth loading.
+
 ## [2.0.9] — 2026-09-06
 
 - Campus Printer & Email Printing: Introduced Print by Email support to submit documents and duplex print jobs from any device or off-campus.

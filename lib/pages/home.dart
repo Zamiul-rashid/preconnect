@@ -713,28 +713,11 @@ class _HomeData {
         );
       }
     }
-    final entries = <_ScheduleEntry>[];
-    for (final sectionItem in sections) {
-      if (CourseSectionExamFilter.isFinishedAfterFinalExam(
-        section: sectionItem,
-        overrides: examOverrides,
-      )) {
-        continue;
-      }
-      for (final classSchedule in sectionItem.sectionSchedule.classSchedules) {
-        entries.add(
-          _ScheduleEntry(
-            day: classSchedule.day,
-            startTime: classSchedule.startTime,
-            endTime: classSchedule.endTime,
-            courseCode: sectionItem.courseCode,
-            sectionName: sectionItem.sectionName,
-            roomNumber: sectionItem.roomNumber,
-            faculties: sectionItem.faculties,
-          ),
-        );
-      }
-    }
+    final entries = _ScheduleEntry.buildEntries(
+      sections: sections,
+      overrides: examOverrides,
+      isRamadan: ramadan.isRamadan,
+    );
     final advisingJson = json['advisingInfo'];
     final advisingInfo = advisingJson is Map
         ? advisingJson.map((key, value) => MapEntry('$key', value?.toString()))
@@ -802,6 +785,8 @@ class _ScheduleEntry {
     required this.sectionName,
     required this.roomNumber,
     required this.faculties,
+    this.startDate,
+    this.endDate,
   });
 
   final String day;
@@ -811,4 +796,47 @@ class _ScheduleEntry {
   final String sectionName;
   final String? roomNumber;
   final String? faculties;
+  final String? startDate;
+  final String? endDate;
+
+  static List<_ScheduleEntry> buildEntries({
+    required List<section.Section> sections,
+    required Map<String, ExamScheduleOverride> overrides,
+    required bool isRamadan,
+  }) {
+    final entries = <_ScheduleEntry>[];
+    final seen = <String>{};
+    for (final s in sections) {
+      if (CourseSectionExamFilter.isFinishedAfterFinalExam(
+        section: s,
+        overrides: overrides,
+      )) {
+        continue;
+      }
+      for (final cs in s.sectionSchedule.classSchedules) {
+        final adjusted = RamadanTiming.adjustRange(
+          cs.startTime,
+          cs.endTime,
+          isRamadan: isRamadan,
+        );
+        final key =
+            '${s.courseCode}|${s.sectionName}|${cs.day}|${adjusted.startTime}|${adjusted.endTime}|${s.roomNumber}';
+        if (!seen.add(key)) continue;
+        entries.add(
+          _ScheduleEntry(
+            day: cs.day,
+            startTime: adjusted.startTime,
+            endTime: adjusted.endTime,
+            courseCode: s.courseCode,
+            sectionName: s.sectionName,
+            roomNumber: s.roomNumber,
+            faculties: s.faculties,
+            startDate: s.sectionSchedule.classStartDate,
+            endDate: s.sectionSchedule.classEndDate,
+          ),
+        );
+      }
+    }
+    return entries;
+  }
 }

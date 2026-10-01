@@ -34,7 +34,6 @@ class _SettingsPageState extends State<SettingsPage>
   bool _showNotificationsIcon = true;
   bool _showFundingSection = true;
   bool _appLockEnabled = false;
-  int _appLockTimeoutSeconds = AppLockService.defaultTimeoutSeconds;
   bool _quietModeEnabled = false;
   bool _quietModeNeedsSetup = false;
   String? _quietModeSetupPermission;
@@ -63,7 +62,6 @@ class _SettingsPageState extends State<SettingsPage>
   Future<void> _loadSettings() async {
     final visibility = await HomeCardPreferences.load();
     final appLock = await AppLockService().isEnabled();
-    final appLockTimeout = await AppLockService().getTimeoutSeconds();
     await QuietModeController.instance.load();
     final quietModeResult = await QuietModeController.instance.refresh();
 
@@ -78,7 +76,6 @@ class _SettingsPageState extends State<SettingsPage>
         _showTodaySchedule = visibility.showTodaySchedule;
         _showFundingSection = visibility.showFundingSection;
         _appLockEnabled = appLock;
-        _appLockTimeoutSeconds = appLockTimeout;
         _quietModeEnabled = QuietModeController.instance.isEnabled;
         _quietModeNeedsSetup = quietModeResult.status == 'permission_required';
         _quietModeSetupPermission = quietModeResult.permission;
@@ -135,31 +132,6 @@ class _SettingsPageState extends State<SettingsPage>
         context,
         value ? 'App lock enabled' : 'App lock disabled',
       );
-    }
-  }
-
-  Future<void> _chooseLockTimeout() async {
-    final selected = await showAppSelectSheet<int>(
-      context,
-      title: 'Lock Timeout',
-      subtitle: 'Require authentication after backgrounding',
-      selectedValue: _appLockTimeoutSeconds,
-      options: const [
-        AppSelectOption(value: 0, label: 'Immediately'),
-        AppSelectOption(value: 30, label: '30 seconds'),
-        AppSelectOption(value: 60, label: '1 minute'),
-        AppSelectOption(value: 300, label: '5 minutes'),
-        AppSelectOption(value: 900, label: '15 minutes'),
-      ],
-    );
-    if (selected != null && selected != _appLockTimeoutSeconds) {
-      await AppLockService().setTimeoutSeconds(selected);
-      if (mounted) {
-        setState(() {
-          _appLockTimeoutSeconds = selected;
-        });
-      }
-      RefreshBus.instance.notify(reason: 'app_lock_settings_changed');
     }
   }
 
@@ -431,67 +403,11 @@ class _SettingsPageState extends State<SettingsPage>
           ),
           const Gap(_sectionGap),
           AppCard(
-            child: Column(
-              children: [
-                _ToggleRow(
-                  title: 'App Lock',
-                  subtitle: 'System lock security for the app',
-                  value: _appLockEnabled,
-                  onChanged: _setAppLock,
-                ),
-                if (_appLockEnabled) ...[
-                  const Divider(height: 20),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: _chooseLockTimeout,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Lock Timeout',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppPalette.textPrimary(context),
-                                  ),
-                                ),
-                                const Gap(2),
-                                Text(
-                                  'Require authentication after being in background',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppPalette.textSecondary(context),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Gap(8),
-                          Text(
-                            AppLockService.timeoutLabel(_appLockTimeoutSeconds),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppPalette.primary,
-                            ),
-                          ),
-                          const Gap(4),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 18,
-                            color: AppPalette.textSecondary(context),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+            child: _ToggleRow(
+              title: 'App Lock',
+              subtitle: 'System lock security for the app',
+              value: _appLockEnabled,
+              onChanged: _setAppLock,
             ),
           ),
 

@@ -372,33 +372,11 @@ class _HomeDashboardState extends State<_HomeDashboard> with RefreshBusState {
       if (examOverridesFuture != null) {
         examOverrides = await examOverridesFuture;
       }
-      final List<_ScheduleEntry> entries = [];
-      for (final section in sections) {
-        if (CourseSectionExamFilter.isFinishedAfterFinalExam(
-          section: section,
-          overrides: examOverrides,
-        )) {
-          continue;
-        }
-        for (final s in section.sectionSchedule.classSchedules) {
-          final adjusted = RamadanTiming.adjustRange(
-            s.startTime,
-            s.endTime,
-            isRamadan: isRamadan,
-          );
-          entries.add(
-            _ScheduleEntry(
-              day: s.day,
-              startTime: adjusted.startTime,
-              endTime: adjusted.endTime,
-              courseCode: section.courseCode,
-              sectionName: section.sectionName,
-              roomNumber: section.roomNumber,
-              faculties: section.faculties,
-            ),
-          );
-        }
-      }
+      final entries = _ScheduleEntry.buildEntries(
+        sections: sections,
+        overrides: examOverrides,
+        isRamadan: isRamadan,
+      );
       final scheduleJson = jsonEncode(sections.map((s) => s.toJson()).toList());
       final data = _HomeData(
         profile: profile,
@@ -615,14 +593,26 @@ class _HomeDashboardState extends State<_HomeDashboard> with RefreshBusState {
       return cached;
     }
 
-    final todayDate = DateFormat('d MMMM, yyyy').format(DateTime.now());
+    final now = DateTime.now();
+    final todayNormalized = DateTime(now.year, now.month, now.day);
+    final todayDate = DateFormat('d MMMM, yyyy').format(now);
     final todayEntries =
-        (data?.entries ?? const <_ScheduleEntry>[])
-            .where((e) => normalizeWeekday(e.day) == normalizeWeekday(today))
-            .toList()
-          ..sort(
-            (a, b) => _timeToMinutes(a.startTime) - _timeToMinutes(b.startTime),
-          );
+        (data?.entries ?? const <_ScheduleEntry>[]).where((e) {
+          if (normalizeWeekday(e.day) != normalizeWeekday(today)) return false;
+          final s = AppTime.parseDate(e.startDate);
+          if (s != null &&
+              todayNormalized.isBefore(DateTime(s.year, s.month, s.day))) {
+            return false;
+          }
+          final end = AppTime.parseDate(e.endDate);
+          if (end != null &&
+              todayNormalized.isAfter(DateTime(end.year, end.month, end.day))) {
+            return false;
+          }
+          return true;
+        }).toList()..sort(
+          (a, b) => _timeToMinutes(a.startTime) - _timeToMinutes(b.startTime),
+        );
     final examWeekStatus = _todayExamWeekStatus(
       data?.sections ?? const <section.Section>[],
       data?.examOverrides ?? const <String, ExamScheduleOverride>{},
@@ -1020,7 +1010,13 @@ class _HomeDashboardState extends State<_HomeDashboard> with RefreshBusState {
         );
       }
     }
-    exams.sort((a, b) {
+    final seen = <String>{};
+    final uniqueExams = exams.where((e) {
+      final key =
+          '${e.courseCode}|${e.type}|${e.dateTime.millisecondsSinceEpoch}|${e.room ?? ''}';
+      return seen.add(key);
+    }).toList();
+    uniqueExams.sort((a, b) {
       return ExamSorting.compareExamEntries(
         typeA: a.type,
         typeB: b.type,
@@ -1032,7 +1028,7 @@ class _HomeDashboardState extends State<_HomeDashboard> with RefreshBusState {
         sectionNameB: b.sectionName,
       );
     });
-    return exams;
+    return uniqueExams;
   }
 
   int _timeToMinutes(String time) {

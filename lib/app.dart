@@ -222,7 +222,6 @@ class _MyAppState extends State<MyApp>
   late bool _canOpenOffline;
   late AppBootstrapState _resolvedBootstrapState;
   bool _appLockEnabled = false;
-  int _appLockTimeoutSeconds = AppLockService.defaultTimeoutSeconds;
   bool _isUnlocked = true;
   bool _isUnlocking = false;
   DateTime? _lastPausedAt;
@@ -517,11 +516,6 @@ class _MyAppState extends State<MyApp>
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       if (_appLockEnabled && _isUnlocked && !_isUnlocking) {
-        if (_appLockTimeoutSeconds == 0 && state == AppLifecycleState.paused) {
-          setState(() {
-            _isUnlocked = false;
-          });
-        }
         _lastPausedAt ??= DateTime.now();
       }
     }
@@ -782,11 +776,9 @@ class _MyAppState extends State<MyApp>
 
   Future<void> _initializeAppLock() async {
     final enabled = await AppLockService().isEnabled();
-    final timeout = await AppLockService().getTimeoutSeconds();
     if (!mounted) return;
     setState(() {
       _appLockEnabled = enabled;
-      _appLockTimeoutSeconds = timeout;
       _isUnlocked = !enabled;
     });
     if (enabled) {
@@ -796,9 +788,7 @@ class _MyAppState extends State<MyApp>
 
   Future<void> _refreshAndUnlockIfNeeded() async {
     final enabled = await AppLockService().isEnabled();
-    final timeout = await AppLockService().getTimeoutSeconds();
     if (!mounted) return;
-    _appLockTimeoutSeconds = timeout;
     if (!enabled) {
       _lastPausedAt = null;
       if (_appLockEnabled || !_isUnlocked) {
@@ -815,8 +805,8 @@ class _MyAppState extends State<MyApp>
       });
     }
     if (_lastPausedAt != null && _isUnlocked) {
-      final elapsed = DateTime.now().difference(_lastPausedAt!).inSeconds;
-      if (elapsed >= _appLockTimeoutSeconds) {
+      final elapsed = DateTime.now().difference(_lastPausedAt!);
+      if (elapsed >= AppLockService.timeout) {
         setState(() {
           _isUnlocked = false;
         });
