@@ -85,7 +85,18 @@ class AdvisingSectionRecord {
       capacity: _requiredInt(json, 'capacity'),
       consumedSeat: _requiredInt(json, 'consumedSeat'),
       courseCredit: _requiredInt(json, 'courseCredit'),
-      faculty: _nullableString(json, 'faculties'),
+      faculty: () {
+        final v = json['faculties'];
+        if (v is Map) {
+          final m = v.cast<String, dynamic>();
+          final s = '${m['shortName'] ?? ''}'.trim();
+          if (s.isNotEmpty) return s;
+          final n = '${m['staffName'] ?? m['name'] ?? ''}'.trim();
+          return n.isEmpty ? null : n;
+        }
+        final s = v?.toString().trim();
+        return (s == null || s.isEmpty) ? null : s;
+      }(),
       roomNumber: _nullableString(json, 'roomNumber'),
       labSectionId: _nullableInt(json, 'labSectionId'),
       labSectionName: _nullableString(json, 'labSectionName'),

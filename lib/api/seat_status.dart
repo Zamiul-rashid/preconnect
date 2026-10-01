@@ -280,8 +280,8 @@ class SeatStatusDetailsResponse {
       consumedSeat: _toInt(json['consumedSeat']),
       semesterSessionId: _toInt(json['semesterSessionId']),
       parentSectionId: _toNullableInt(json['parentSectionId']),
-      faculty: _facultyFromJson(json['faculties']),
-      faculties: _facultyLabel(json['faculties']),
+      faculty: _facultyFromJson(json['faculties'] ?? json['faculty']),
+      faculties: _facultyLabel(json['faculties'] ?? json['faculty']),
       roomName: _toString(json['roomName']),
       roomNumber: _toString(json['roomNumber']),
       courseType: _toString(json['courseType']),
@@ -466,16 +466,29 @@ String _facultyLabel(dynamic value) {
     final map = value.cast<String, dynamic>();
     final shortName = _toString(map['shortName']);
     if (shortName.isNotEmpty) return shortName;
-    final staffName = _toString(map['staffName']);
-    if (staffName.isNotEmpty) return staffName;
-    return '';
+    return _toString(map['staffName'] ?? map['name']);
   }
-  return _toString(value);
+  final text = _toString(value);
+  return text.toUpperCase() == 'NULL' ? '' : text;
 }
 
 SectionFaculty? _facultyFromJson(dynamic value) {
-  if (value is! Map) return null;
-  return SectionFaculty.fromJson(value.cast<String, dynamic>());
+  if (value == null) return null;
+  if (value is Map) {
+    return SectionFaculty.fromJson(value.cast<String, dynamic>());
+  }
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed.toUpperCase() == 'TBA') return null;
+    return SectionFaculty(
+      id: trimmed,
+      staffName: trimmed,
+      shortName: trimmed,
+      email: '',
+      imgUrl: null,
+    );
+  }
+  return null;
 }
 
 String? _toNullableString(dynamic value) {

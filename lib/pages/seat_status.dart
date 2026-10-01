@@ -21,23 +21,25 @@ import 'package:preconnect/pages/shared_widgets/seat_filters.dart';
 part 'shared_widgets/seat_status.dart';
 
 String seatStatusFacultySummaryLabel(section.SectionFaculty? faculty) {
-  final staffName = faculty?.staffName.trim() ?? '';
-  if (staffName.isEmpty || staffName.toUpperCase() == 'TBA') {
-    return 'TBA';
+  if (faculty == null) return 'TBA';
+  final shortName = faculty.shortName.trim();
+  if (shortName.isNotEmpty && shortName.toUpperCase() != 'TBA') {
+    return shortName;
   }
-  final shortName = faculty?.shortName.trim() ?? '';
-  if (shortName.isNotEmpty) return shortName;
-  return '';
+  final staffName = faculty.staffName.trim();
+  if (staffName.isNotEmpty && staffName.toUpperCase() != 'TBA') {
+    return staffName;
+  }
+  return 'TBA';
 }
 
 String seatStatusFacultyDetailLabel(section.SectionFaculty? faculty) {
-  final staffName = faculty?.staffName.trim() ?? '';
-  if (staffName.isEmpty || staffName.toUpperCase() == 'TBA') return '';
-  final pieces = <String>[
-    faculty?.staffName.trim() ?? '',
-    faculty?.email.trim() ?? '',
-  ];
-  return pieces.where((value) => value.trim().isNotEmpty).join(' ').trim();
+  if (faculty == null) return '';
+  final name = faculty.staffName.trim();
+  final email = faculty.email.trim();
+  if (name.isEmpty) return email;
+  if (email.isEmpty) return name;
+  return '$name $email';
 }
 
 String seatStatusFacultySearchText(section.SectionFaculty? faculty) {
@@ -49,11 +51,11 @@ String seatStatusFacultySearchText(section.SectionFaculty? faculty) {
 }
 
 bool seatStatusFacultyHasVisuals(section.SectionFaculty? faculty) {
-  final staffName = faculty?.staffName.trim() ?? '';
-  if (staffName.isEmpty || staffName.toUpperCase() == 'TBA') return false;
-  return staffName.isNotEmpty ||
-      (faculty?.email.trim().isNotEmpty == true) ||
-      (faculty?.imgUrl?.trim().isNotEmpty == true);
+  if (faculty == null) return false;
+  return faculty.shortName.trim().isNotEmpty ||
+      faculty.staffName.trim().isNotEmpty ||
+      faculty.email.trim().isNotEmpty ||
+      faculty.imgUrl?.trim().isNotEmpty == true;
 }
 
 class SeatStatusPage extends StatefulWidget {

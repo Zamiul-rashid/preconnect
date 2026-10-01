@@ -24,12 +24,19 @@ class SectionFaculty {
   int get hashCode => id.hashCode;
 
   factory SectionFaculty.fromJson(Map<String, dynamic> json) {
+    final shortName = (json['shortName'] ?? '').toString().trim();
+    final staffName = (json['staffName'] ?? json['name'] ?? shortName)
+        .toString()
+        .trim();
+    final id = (json['id'] ?? shortName).toString().trim();
+    final email = (json['email'] ?? '').toString().trim();
+    final imgUrl = json['imgUrl']?.toString().trim();
     return SectionFaculty(
-      id: json['id'] as String? ?? '',
-      staffName: json['staffName'] as String? ?? '',
-      shortName: json['shortName'] as String? ?? '',
-      email: json['email'] as String? ?? '',
-      imgUrl: json['imgUrl'] as String?,
+      id: id,
+      staffName: staffName,
+      shortName: shortName,
+      email: email,
+      imgUrl: imgUrl == null || imgUrl.isEmpty ? null : imgUrl,
     );
   }
 
@@ -114,8 +121,8 @@ class Section {
       sectionSchedule: SectionSchedule.fromJson(
         _scheduleMapFromJson(json['sectionSchedule']),
       ),
-      faculty: _facultyFromJson(json['faculties']),
-      faculties: _facultyLabel(json['faculties']),
+      faculty: _facultyFromJson(json['faculties'] ?? json['faculty']),
+      faculties: _facultyLabel(json['faculties'] ?? json['faculty']),
       roomName: _stringValue(json, 'roomName'),
       roomNumber: _stringValue(json, 'roomNumber'),
       prerequisiteCourses: json['prerequisiteCourses']?.toString(),
@@ -315,9 +322,22 @@ int? _nullableIntValue(Map<String, dynamic> json, String key) {
 }
 
 SectionFaculty? _facultyFromJson(dynamic value) {
-  if (value is! Map) return null;
-  final map = value.cast<String, dynamic>();
-  return SectionFaculty.fromJson(map);
+  if (value == null) return null;
+  if (value is Map) {
+    return SectionFaculty.fromJson(value.cast<String, dynamic>());
+  }
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed.toUpperCase() == 'TBA') return null;
+    return SectionFaculty(
+      id: trimmed,
+      staffName: trimmed,
+      shortName: trimmed,
+      email: '',
+      imgUrl: null,
+    );
+  }
+  return null;
 }
 
 String _facultyLabel(dynamic value) {
@@ -325,11 +345,11 @@ String _facultyLabel(dynamic value) {
     final map = value.cast<String, dynamic>();
     final shortName = '${map['shortName'] ?? ''}'.trim();
     if (shortName.isNotEmpty) return shortName;
-    final staffName = '${map['staffName'] ?? ''}'.trim();
-    if (staffName.isNotEmpty) return staffName;
-    return '';
+    final name = '${map['staffName'] ?? map['name'] ?? ''}'.trim();
+    return name;
   }
-  return '$value'.trim();
+  final text = '$value'.trim();
+  return text.toUpperCase() == 'NULL' ? '' : text;
 }
 
 List<Section> parseSectionsFromScheduleJson(String? scheduleJson) {
