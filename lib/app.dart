@@ -222,8 +222,11 @@ class _MyAppState extends State<MyApp>
   late bool _canOpenOffline;
   late AppBootstrapState _resolvedBootstrapState;
   bool _appLockEnabled = false;
+  int _appLockTimeoutSeconds = AppLockService.defaultTimeoutSeconds;
   bool _isUnlocked = true;
   bool _isUnlocking = false;
+  DateTime? _lastPausedAt;
+
   WebExtensionSessionFlow? _webExtensionSessionFlow;
   StreamSubscription<WebExtensionSessionEvent>? _webSessionSub;
   WebExtensionShortcutBridge? _webShortcutBridge;
@@ -511,11 +514,15 @@ class _MyAppState extends State<MyApp>
       return;
     }
     if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
-      if (_appLockEnabled && _isUnlocked) {
-        setState(() {
-          _isUnlocked = false;
-        });
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (_appLockEnabled && _isUnlocked && !_isUnlocking) {
+        if (_appLockTimeoutSeconds == 0 && state == AppLifecycleState.paused) {
+          setState(() {
+            _isUnlocked = false;
+          });
+        }
+        _lastPausedAt ??= DateTime.now();
       }
     }
   }
@@ -775,9 +782,11 @@ class _MyAppState extends State<MyApp>
 
   Future<void> _initializeAppLock() async {
     final enabled = await AppLockService().isEnabled();
+    final timeout = await AppLockService().getTimeoutSeconds();
     if (!mounted) return;
     setState(() {
       _appLockEnabled = enabled;
+      _appLockTimeoutSeconds = timeout;
       _isUnlocked = !enabled;
     });
     if (enabled) {
@@ -787,8 +796,11 @@ class _MyAppState extends State<MyApp>
 
   Future<void> _refreshAndUnlockIfNeeded() async {
     final enabled = await AppLockService().isEnabled();
+    final timeout = await AppLockService().getTimeoutSeconds();
     if (!mounted) return;
+    _appLockTimeoutSeconds = timeout;
     if (!enabled) {
+      _lastPausedAt = null;
       if (_appLockEnabled || !_isUnlocked) {
         setState(() {
           _appLockEnabled = false;
@@ -802,6 +814,15 @@ class _MyAppState extends State<MyApp>
         _appLockEnabled = true;
       });
     }
+    if (_lastPausedAt != null && _isUnlocked) {
+      final elapsed = DateTime.now().difference(_lastPausedAt!).inSeconds;
+      if (elapsed >= _appLockTimeoutSeconds) {
+        setState(() {
+          _isUnlocked = false;
+        });
+      }
+    }
+    _lastPausedAt = null;
     if (!_isUnlocked) {
       await _unlockApp();
     }
