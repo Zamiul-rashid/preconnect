@@ -203,7 +203,6 @@ String? parseActiveAdvisingSessionId(String body, AdvisingPhase phase) {
   if (decoded is! List) {
     throw const FormatException('Invalid active advising sessions response.');
   }
-  String? sessionId;
   for (final item in decoded) {
     if (item is! Map) {
       throw const FormatException('Invalid active advising session record.');
@@ -212,12 +211,9 @@ String? parseActiveAdvisingSessionId(String body, AdvisingPhase phase) {
     final responsePhase = _requiredString(json, 'advisingPhase').toUpperCase();
     if (responsePhase != phase.queryValue) continue;
     final id = _requiredString(json, 'id');
-    if (sessionId != null && sessionId != id) {
-      throw const FormatException('Multiple active advising sessions found.');
-    }
-    sessionId = id;
+    return id;
   }
-  return sessionId;
+  return null;
 }
 
 class AdvisingHelperService {

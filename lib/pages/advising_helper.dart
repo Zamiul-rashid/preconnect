@@ -39,6 +39,7 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
   String? _errorMessage;
   String? _portfolioId;
   String? _publicKey;
+  String? _sessionId;
   String? _enrolledError;
   AdvisingSectionRecord? _replacementSource;
 
@@ -137,6 +138,7 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
       if (!mounted || generation != _loadGeneration) return;
       _portfolioId = portfolioId;
       _publicKey = publicKey;
+      _sessionId = sessionId;
       _enrolledError = enrolledError;
 
       setState(() {
@@ -436,6 +438,15 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
       if (_portfolioId == null || _publicKey == null) {
         return;
       }
+      if (_phase == AdvisingPhase.selfRegistration && _sessionId == null) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            'No active self-registration session found. Try refreshing.',
+          );
+        }
+        return;
+      }
       _engine.start(
         portfolioId: _portfolioId!,
         publicKey: _publicKey!,
@@ -515,6 +526,7 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
                               _enrolled = const [];
                               _portfolioId = null;
                               _publicKey = null;
+                              _sessionId = null;
                               _errorMessage = null;
                               _enrolledError = null;
                               _replacementSource = null;
