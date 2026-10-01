@@ -99,8 +99,22 @@ class ApiConfig {
   static String advisingPath(String studentId) =>
       '/adv/v1/advising/$studentId/active-advising-sessions';
 
+  static String selfRegistrationSessionPath(
+    String studentId,
+    String sessionKey,
+  ) =>
+      '/adv/v1/advising/$studentId/self-registration-session?sessionKey=$sessionKey';
+
   static String advisingStudentCoursesPath(AdvisingPhase phase) =>
-      '/adv/v1/student-courses/${phase.pathSegment}';
+      phase == AdvisingPhase.selfRegistration
+      ? '/adv/v1/student-courses'
+      : '/adv/v1/student-courses/${phase.pathSegment}';
+
+  static String advisingSectionsPath(
+    String portfolioId, {
+    required AdvisingPhase phase,
+  }) =>
+      '/adv/v1/advising/sections?studentPortfolioId=$portfolioId&phase=${phase.queryValue}';
 
   static String advisingConfirmPath(String sessionId) =>
       '/adv/v1/advising/$sessionId/confirm';
@@ -139,7 +153,9 @@ class ApiConfig {
   static String studentCoursesForPhasePath(
     String portfolioId,
     AdvisingPhase phase,
-  ) => '/adv/v1/student-courses/$portfolioId/${phase.pathSegment}';
+  ) => phase == AdvisingPhase.selfRegistration
+      ? '/adv/v1/student-courses/$portfolioId'
+      : '/adv/v1/student-courses/$portfolioId/${phase.pathSegment}';
 
   static String attendancePath(String portfolioId) =>
       '/exc/v1/student-courses/$portfolioId/current-semester-attendance';

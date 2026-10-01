@@ -76,17 +76,21 @@ class AdvisingSectionRecord {
 
   factory AdvisingSectionRecord.fromJson(Map<String, dynamic> json) {
     return AdvisingSectionRecord(
-      sectionId: _requiredInt(json, 'sectionId'),
+      sectionId: _nullableInt(json, 'sectionId') ?? _requiredInt(json, 'id'),
       advisingSectionId: _nullableInt(json, 'advisingSectionId'),
       courseId: _nullableInt(json, 'courseId'),
-      courseCode: _requiredString(json, 'courseCode'),
-      courseName: _nullableString(json, 'name'),
-      sectionName: _requiredString(json, 'sectionName'),
-      capacity: _requiredInt(json, 'capacity'),
-      consumedSeat: _requiredInt(json, 'consumedSeat'),
-      courseCredit: _requiredInt(json, 'courseCredit'),
+      courseCode:
+          _nullableString(json, 'courseCode') ?? _requiredString(json, 'code'),
+      courseName:
+          _nullableString(json, 'name') ?? _nullableString(json, 'courseName'),
+      sectionName:
+          _nullableString(json, 'sectionName') ??
+          _requiredString(json, 'section'),
+      capacity: _nullableInt(json, 'capacity') ?? 0,
+      consumedSeat: _nullableInt(json, 'consumedSeat') ?? 0,
+      courseCredit: _nullableInt(json, 'courseCredit') ?? 0,
       faculty: () {
-        final v = json['faculties'];
+        final v = json['faculties'] ?? json['faculty'];
         if (v is Map) {
           final m = v.cast<String, dynamic>();
           final s = '${m['shortName'] ?? ''}'.trim();
@@ -97,7 +101,9 @@ class AdvisingSectionRecord {
         final s = v?.toString().trim();
         return (s == null || s.isEmpty) ? null : s;
       }(),
-      roomNumber: _nullableString(json, 'roomNumber'),
+      roomNumber:
+          _nullableString(json, 'roomNumber') ??
+          _nullableString(json, 'roomName'),
       labSectionId: _nullableInt(json, 'labSectionId'),
       labSectionName: _nullableString(json, 'labSectionName'),
     );
@@ -182,14 +188,19 @@ String? _nullableString(Map<String, dynamic> json, String key) {
 
 List<AdvisingSectionRecord> parseAdvisedSectionsResponse(String body) {
   final decoded = jsonDecode(body);
-  if (decoded is! List) {
-    throw const FormatException('Invalid advised sections response.');
-  }
+  final list = switch (decoded) {
+    final List<dynamic> value => value,
+    final Map<dynamic, dynamic> value when value['sections'] is List =>
+      value['sections'] as List<dynamic>,
+    final Map<dynamic, dynamic> value when value['courses'] is List =>
+      value['courses'] as List<dynamic>,
+    final Map<dynamic, dynamic> value when value['data'] is List =>
+      value['data'] as List<dynamic>,
+    _ => throw const FormatException('Invalid advised sections response.'),
+  };
   final sections = <int, AdvisingSectionRecord>{};
-  for (final item in decoded) {
-    if (item is! Map) {
-      throw const FormatException('Invalid advised section record.');
-    }
+  for (final item in list) {
+    if (item is! Map) continue;
     final section = AdvisingSectionRecord.fromJson(
       item.cast<String, dynamic>(),
     );
@@ -231,10 +242,10 @@ class AdvisingHelperService {
     return <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json, text/plain, */*',
-      'X-REALM': 'bracu',
-      'X-SOURCE': '3',
+      'x-realm': 'bracu',
+      'x-source': '3',
       if (publicKey != null && publicKey.isNotEmpty)
-        'X-Advising-Session': publicKey,
+        'x-advising-session': publicKey,
     };
   }
 
@@ -242,6 +253,29 @@ class AdvisingHelperService {
     String studentId, {
     required AdvisingPhase phase,
   }) async {
+    if (phase == AdvisingPhase.selfRegistration) {
+      final sessionKey = DateTime.now().millisecondsSinceEpoch.toString();
+      final url =
+          '${ApiConfig.connectApiBase}${ApiConfig.selfRegistrationSessionPath(studentId, sessionKey)}';
+      try {
+        final res = await _client.authenticatedRequest(
+          'POST',
+          url,
+          body: '',
+          additionalHeaders: const <String, String>{
+            'Content-Type': 'text/plain',
+            'x-realm': 'bracu',
+            'x-source': '3',
+          },
+          acceptedStatusCodes: const <int>{200, 201},
+        );
+        if (res.statusCode == 200 || res.statusCode == 201) {
+          return sessionKey;
+        }
+      } catch (_) {}
+      return null;
+    }
+
     final url =
         '${ApiConfig.connectApiBase}${ApiConfig.advisingPath(studentId)}'
         '?advisingPhase=${phase.queryValue}';
@@ -277,7 +311,49 @@ class AdvisingHelperService {
     throw ApiException(res.statusCode, res.body);
   }
 
-  Future<Map<int, SeatStatusDetailsResponse>> fetchRealtimeSections() {
+  Future<Map<int, SeatStatusDetailsResponse>> fetchRealtimeSections({
+    String? portfolioId,
+    AdvisingPhase? phase,
+    String? publicKey,
+  }) async {
+    if (portfolioId != null && phase != null) {
+      try {
+        final url =
+            '${ApiConfig.connectApiBase}${ApiConfig.advisingSectionsPath(portfolioId, phase: phase)}';
+        final headers = await buildRequestHeaders(
+          publicKey: publicKey,
+          phase: phase,
+        );
+        final res = await _client.authenticatedGet(
+          url,
+          additionalHeaders: headers,
+          bypassCache: true,
+        );
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          final list = switch (decoded) {
+            final List<dynamic> value => value,
+            final Map<dynamic, dynamic> value when value['sections'] is List =>
+              value['sections'] as List<dynamic>,
+            final Map<dynamic, dynamic> value when value['data'] is List =>
+              value['data'] as List<dynamic>,
+            _ => null,
+          };
+          if (list != null) {
+            final result = <int, SeatStatusDetailsResponse>{};
+            for (final item in list.whereType<Map>()) {
+              try {
+                final parsed = SeatStatusDetailsResponse.fromJson(
+                  item.cast<String, dynamic>(),
+                );
+                result[parsed.sectionId] = parsed;
+              } catch (_) {}
+            }
+            if (result.isNotEmpty) return result;
+          }
+        }
+      } catch (_) {}
+    }
     return SeatStatusService().fetchRealtimeSections();
   }
 
@@ -504,7 +580,7 @@ class AdvisingAutoEngine extends ChangeNotifier {
     addLog('Advising Helper started');
 
     _loopTimer?.cancel();
-    _loopTimer = Timer.periodic(const Duration(milliseconds: 1000), (_) {
+    _loopTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
       unawaited(_tick());
     });
     unawaited(_tick());
@@ -545,7 +621,11 @@ class AdvisingAutoEngine extends ChangeNotifier {
 
       Map<int, SeatStatusDetailsResponse>? detailsMap;
       try {
-        detailsMap = await _service.fetchRealtimeSections();
+        detailsMap = await _service.fetchRealtimeSections(
+          portfolioId: portfolioId,
+          phase: phase,
+          publicKey: publicKey,
+        );
       } catch (error) {
         if (!isRunning || runGeneration != _runGeneration) return;
         final message = advisingErrorMessage(error);
@@ -640,19 +720,39 @@ class AdvisingAutoEngine extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final replacement = item.replacement;
+      final enrolled = await _service.fetchAdvisedSections(
+        portfolioId!,
+        phase: phase,
+        publicKey: publicKey!,
+      );
+      if (!isRunning || runGeneration != _runGeneration) return;
+      if (enrolled.any((entry) => entry.sectionId == item.sectionId)) {
+        await _recordSuccess(item);
+        await _refreshEnrolledAfterMutation();
+        return;
+      }
+
+      final replacement =
+          item.replacement ??
+          () {
+            final existing = enrolled.cast<AdvisingSectionRecord?>().firstWhere(
+              (entry) =>
+                  entry != null &&
+                  entry.sectionId != item.sectionId &&
+                  entry.courseCode.trim().toUpperCase() ==
+                      item.courseCode.trim().toUpperCase(),
+              orElse: () => null,
+            );
+            if (existing == null) return null;
+            return AdvisingReplacementSource(
+              sectionId: existing.sectionId,
+              courseCode: existing.courseCode,
+              sectionName: existing.sectionName,
+            );
+          }();
+
       var sourceWasDropped = false;
       if (replacement != null) {
-        final enrolled = await _service.fetchAdvisedSections(
-          portfolioId!,
-          phase: phase,
-          publicKey: publicKey!,
-        );
-        if (!isRunning || runGeneration != _runGeneration) return;
-        if (enrolled.any((entry) => entry.sectionId == item.sectionId)) {
-          await _completeReplacement(item);
-          return;
-        }
         if (enrolled.any((entry) => entry.sectionId == replacement.sectionId)) {
           addLog(
             'Dropping ${replacement.courseCode} Sec '
@@ -673,30 +773,37 @@ class AdvisingAutoEngine extends ChangeNotifier {
         }
       }
 
-      try {
-        await _service.addSection(
-          portfolioId: portfolioId!,
-          sectionId: item.sectionId,
-          publicKey: publicKey!,
-          phase: phase,
-        );
-      } catch (error) {
+      var addSucceeded = false;
+      Object? lastAddError;
+      for (var addAttempt = 1; addAttempt <= 3; addAttempt++) {
         try {
-          if (await _waitForEnrollment(item.sectionId)) {
-            await _recordSuccess(item);
-            await _refreshEnrolledAfterMutation();
-            return;
-          }
-          if (sourceWasDropped && replacement != null) {
-            await _restoreReplacementSource(replacement);
-          }
-        } catch (verificationError) {
-          addLog(
-            'Could not verify the add after Connect returned an error: '
-            '${advisingErrorMessage(verificationError)}',
+          await _service.addSection(
+            portfolioId: portfolioId!,
+            sectionId: item.sectionId,
+            publicKey: publicKey!,
+            phase: phase,
           );
+          addSucceeded = true;
+          break;
+        } catch (error) {
+          lastAddError = error;
+          if (await _waitForEnrollment(item.sectionId)) {
+            addSucceeded = true;
+            break;
+          }
+          if (addAttempt < 3) {
+            await Future<void>.delayed(const Duration(milliseconds: 40));
+          }
         }
-        rethrow;
+      }
+
+      if (!addSucceeded) {
+        if (sourceWasDropped && replacement != null) {
+          await _restoreReplacementSource(replacement);
+        }
+        if (lastAddError != null) {
+          throw lastAddError;
+        }
       }
 
       if (!targetSections.any((e) => e.sectionId == item.sectionId)) {
@@ -710,7 +817,7 @@ class AdvisingAutoEngine extends ChangeNotifier {
         throw StateError('Connect did not confirm the new enrollment');
       }
 
-      await _recordSuccess(item);
+      await _recordSuccess(item, replacement: replacement);
       await _refreshEnrolledAfterMutation();
     } catch (e) {
       if (!targetSections.any((e) => e.sectionId == item.sectionId)) {
@@ -734,19 +841,23 @@ class AdvisingAutoEngine extends ChangeNotifier {
       );
       if (enrolled.any((entry) => entry.sectionId == sectionId)) return true;
       if (attempt < 2) {
-        await Future<void>.delayed(const Duration(milliseconds: 250));
+        await Future<void>.delayed(const Duration(milliseconds: 40));
       }
     }
     return false;
   }
 
-  Future<void> _recordSuccess(TargetSectionItem item) async {
-    if (item.replacement == null) {
+  Future<void> _recordSuccess(
+    TargetSectionItem item, {
+    AdvisingReplacementSource? replacement,
+  }) async {
+    final rep = item.replacement ?? replacement;
+    if (rep == null) {
       item.status = TargetSectionStatus.added;
       item.message = 'Successfully added!';
       addLog('Success: ${item.courseCode} Sec ${item.sectionName} enrolled');
     } else {
-      await _completeReplacement(item);
+      await _completeReplacement(item, rep);
     }
   }
 
@@ -760,14 +871,19 @@ class AdvisingAutoEngine extends ChangeNotifier {
     }
   }
 
-  Future<void> _completeReplacement(TargetSectionItem item) async {
-    final replacement = item.replacement!;
+  Future<void> _completeReplacement(
+    TargetSectionItem item, [
+    AdvisingReplacementSource? replacement,
+  ]) async {
+    final rep = replacement ?? item.replacement!;
     addLog(
-      'Success: ${replacement.courseCode} Sec ${replacement.sectionName} '
+      'Success: ${rep.courseCode} Sec ${rep.sectionName} '
       'replaced with ${item.courseCode} Sec ${item.sectionName}',
     );
     targetSections.removeWhere(
-      (entry) => entry.replacement?.groupKey == replacement.groupKey,
+      (entry) =>
+          entry.sectionId == item.sectionId ||
+          entry.replacement?.groupKey == rep.groupKey,
     );
     onReplacementCompleted?.call();
     if (targetSections.isEmpty) stop();
@@ -778,32 +894,38 @@ class AdvisingAutoEngine extends ChangeNotifier {
     AdvisingReplacementSource replacement,
   ) async {
     addLog(
-      'Add failed; attempting to restore ${replacement.courseCode} '
+      'Add failed; aggressively restoring ${replacement.courseCode} '
       'Sec ${replacement.sectionName}',
     );
-    try {
-      await _service.addSection(
-        portfolioId: portfolioId!,
-        sectionId: replacement.sectionId,
-        publicKey: publicKey!,
-        phase: phase,
-      );
-      final enrolled = await _service.fetchAdvisedSections(
-        portfolioId!,
-        phase: phase,
-        publicKey: publicKey!,
-      );
-      if (!enrolled.any((entry) => entry.sectionId == replacement.sectionId)) {
-        throw StateError('Connect did not confirm the restored enrollment');
+    for (var attempt = 1; attempt <= 5; attempt++) {
+      try {
+        await _service.addSection(
+          portfolioId: portfolioId!,
+          sectionId: replacement.sectionId,
+          publicKey: publicKey!,
+          phase: phase,
+        );
+        final enrolled = await _service.fetchAdvisedSections(
+          portfolioId!,
+          phase: phase,
+          publicKey: publicKey!,
+        );
+        if (enrolled.any((entry) => entry.sectionId == replacement.sectionId)) {
+          addLog(
+            'Restored ${replacement.courseCode} Sec ${replacement.sectionName}',
+          );
+          return;
+        }
+      } catch (error) {
+        if (attempt == 5) {
+          addLog(
+            'URGENT: Could not restore ${replacement.courseCode} Sec '
+            '${replacement.sectionName}: ${advisingErrorMessage(error)}',
+          );
+          return;
+        }
       }
-      addLog(
-        'Restored ${replacement.courseCode} Sec ${replacement.sectionName}',
-      );
-    } catch (error) {
-      addLog(
-        'URGENT: Could not restore ${replacement.courseCode} Sec '
-        '${replacement.sectionName}: ${advisingErrorMessage(error)}',
-      );
+      await Future<void>.delayed(const Duration(milliseconds: 40));
     }
   }
 

@@ -198,6 +198,25 @@ for required_file in \
   fi
 done
 
+python3 -c "
+from pathlib import Path
+
+for rel_path in ['canvaskit/canvaskit.js', 'canvaskit/chromium/canvaskit.js']:
+    target = Path('${COMMON_DIR}') / rel_path
+    if not target.exists():
+        continue
+    content = target.read_text()
+    p1_src = '2===v.version?y.texImage2D(y.TEXTURE_2D,0,y.RGBA,l.width,l.height,0,y.RGBA,y.UNSIGNED_BYTE,h):y.texImage2D(y.TEXTURE_2D,0,y.RGBA,y.RGBA,y.UNSIGNED_BYTE,h)'
+    p1_dst = 'try{2===v.version?y.texImage2D(y.TEXTURE_2D,0,y.RGBA,l.width,l.height,0,y.RGBA,y.UNSIGNED_BYTE,h):y.texImage2D(y.TEXTURE_2D,0,y.RGBA,y.RGBA,y.UNSIGNED_BYTE,h)}catch(_){try{y.texImage2D(y.TEXTURE_2D,0,y.RGBA,l.width||1,l.height||1,0,y.RGBA,y.UNSIGNED_BYTE,null)}catch(_){}}'
+    p2_src = '2===z.version?t.texImage2D(t.TEXTURE_2D,0,t.RGBA,l.width,l.height,0,t.RGBA,t.UNSIGNED_BYTE,h):t.texImage2D(t.TEXTURE_2D,0,t.RGBA,t.RGBA,t.UNSIGNED_BYTE,h)'
+    p2_dst = 'try{2===z.version?t.texImage2D(t.TEXTURE_2D,0,t.RGBA,l.width,l.height,0,t.RGBA,t.UNSIGNED_BYTE,h):t.texImage2D(t.TEXTURE_2D,0,t.RGBA,t.RGBA,t.UNSIGNED_BYTE,h)}catch(_){try{t.texImage2D(t.TEXTURE_2D,0,t.RGBA,l.width||1,l.height||1,0,t.RGBA,t.UNSIGNED_BYTE,null)}catch(_){}}'
+    if p1_src in content:
+        content = content.replace(p1_src, p1_dst)
+    if p2_src in content:
+        content = content.replace(p2_src, p2_dst)
+    target.write_text(content)
+"
+
 if [[ ! -f "${COMMON_DIR}/connect_bridge.js" ]]; then
   echo "Missing Connect browser relay: connect_bridge.js" >&2
   exit 1

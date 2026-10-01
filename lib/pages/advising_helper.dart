@@ -120,7 +120,11 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
       } catch (_) {}
       final publicKey =
           sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
-      final seatsFuture = _service.fetchRealtimeSections();
+      final seatsFuture = _service.fetchRealtimeSections(
+        portfolioId: portfolioId,
+        phase: phase,
+        publicKey: publicKey,
+      );
 
       List<AdvisingSectionRecord> enrolled = const [];
       String? enrolledError;
@@ -192,6 +196,9 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
     _isRefreshingEnrolled = true;
     try {
       await _refreshEnrolled();
+      if (!_engine.isRunning) {
+        await _refreshSeats();
+      }
     } catch (_) {
     } finally {
       _isRefreshingEnrolled = false;
@@ -222,7 +229,11 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
     final publicKey = _publicKey;
     final phase = _phase;
     if (portfolioId == null || publicKey == null) return;
-    final details = await _service.fetchRealtimeSections();
+    final details = await _service.fetchRealtimeSections(
+      portfolioId: portfolioId,
+      phase: phase,
+      publicKey: publicKey,
+    );
     if (mounted &&
         portfolioId == _portfolioId &&
         publicKey == _publicKey &&
@@ -405,7 +416,16 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
     if (alreadyQueued) {
       _engine.removeSectionFromQueue(s.sectionId);
     } else {
-      final replacementSource = _replacementSource;
+      final replacementSource =
+          _replacementSource ??
+          _enrolled.cast<AdvisingSectionRecord?>().firstWhere(
+            (e) =>
+                e != null &&
+                e.sectionId != s.sectionId &&
+                e.courseCode.trim().toUpperCase() ==
+                    s.courseCode.trim().toUpperCase(),
+            orElse: () => null,
+          );
       _engine.addSectionToQueue(
         TargetSectionItem(
           sectionId: s.sectionId,
@@ -435,21 +455,24 @@ class _AdvisingHelperPageState extends State<AdvisingHelperPage> {
     if (_engine.isRunning) {
       _engine.stop();
     } else {
-      if (_portfolioId == null || _publicKey == null) {
-        return;
-      }
-      if (_phase == AdvisingPhase.selfRegistration && _sessionId == null) {
+      final portfolioId = _portfolioId;
+      if (portfolioId == null) {
         if (mounted) {
           showAppSnackBar(
             context,
-            'No active self-registration session found. Try refreshing.',
+            'Student profile is loading. Try refreshing.',
           );
         }
         return;
       }
+      final key =
+          _publicKey ??
+          _sessionId ??
+          DateTime.now().millisecondsSinceEpoch.toString();
+      _publicKey = key;
       _engine.start(
-        portfolioId: _portfolioId!,
-        publicKey: _publicKey!,
+        portfolioId: portfolioId,
+        publicKey: key,
         phase: _phase,
         onSectionAdded: _refreshEnrolled,
         onReplacementCompleted: () {

@@ -105,6 +105,11 @@ const String _ssoCookieUrl =
 final Map<int, String> _connectAuthorizationByTab = <int, String>{};
 final Map<int, Map<String, String>> _connectHeadersByTab =
     <int, Map<String, String>>{};
+String? _latestConnectAuthorization;
+Map<String, String>? _latestConnectHeaders;
+const String _latestConnectAuthorizationKey =
+    'preconnect.latestConnectAuthorization';
+const String _latestConnectHeadersKey = 'preconnect.latestConnectHeaders';
 
 String _connectAuthorizationKey(int tabId) =>
     'preconnect.connectAuthorization.$tabId';
@@ -166,9 +171,11 @@ void _registerConnectAuthorizationObserver() {
           if (name == 'authorization' &&
               value.toLowerCase().startsWith('bearer ')) {
             _connectAuthorizationByTab[resolvedTabId] = value;
+            _latestConnectAuthorization = value;
             unawaited(
               chrome.storage.session.set(<String, Object>{
                 _connectAuthorizationKey(resolvedTabId): value,
+                _latestConnectAuthorizationKey: value,
               }),
             );
           } else if (name.startsWith('x-') && value.isNotEmpty) {
@@ -177,9 +184,11 @@ void _registerConnectAuthorizationObserver() {
               () => <String, String>{},
             );
             observedHeaders[name] = value;
+            _latestConnectHeaders = Map<String, String>.from(observedHeaders);
             unawaited(
               chrome.storage.session.set(<String, Object>{
                 _connectHeadersKey(resolvedTabId): observedHeaders,
+                _latestConnectHeadersKey: observedHeaders,
               }),
             );
           }
@@ -1948,6 +1957,37 @@ Future<void> _handleConnectRequest(Map message) async {
         _connectAuthorizationByTab[tabId] = value;
       }
     }
+    if (browserAuthorization == null && _latestConnectAuthorization != null) {
+      browserAuthorization = _latestConnectAuthorization;
+    }
+    if (browserAuthorization == null) {
+      final stored = await chrome.storage.session.get(
+        _latestConnectAuthorizationKey,
+      );
+      final value = stored[_latestConnectAuthorizationKey];
+      if (value is String && value.toLowerCase().startsWith('bearer ')) {
+        browserAuthorization = value;
+        _latestConnectAuthorization = value;
+      }
+    }
+    if (browserAuthorization == null) {
+      for (final entry in _connectAuthorizationByTab.entries) {
+        if (entry.value.toLowerCase().startsWith('bearer ')) {
+          browserAuthorization = entry.value;
+          break;
+        }
+      }
+    }
+    if (browserAuthorization == null) {
+      final localValues = await chrome.storage.local.get([
+        PreConnectStorageKeys.accessToken,
+      ]);
+      final localToken =
+          '${localValues[PreConnectStorageKeys.accessToken] ?? ''}'.trim();
+      if (localToken.isNotEmpty) {
+        browserAuthorization = 'Bearer $localToken';
+      }
+    }
     if (browserAuthorization == null) {
       throw StateError(
         'Reload the signed-in Connect page so its API authorization can be observed',
@@ -1964,6 +2004,19 @@ Future<void> _handleConnectRequest(Map message) async {
           (key, value) => MapEntry(key.toString(), value.toString()),
         );
         _connectHeadersByTab[tabId] = browserHeaders;
+      }
+    }
+    if (browserHeaders == null && _latestConnectHeaders != null) {
+      browserHeaders = _latestConnectHeaders;
+    }
+    if (browserHeaders == null) {
+      final stored = await chrome.storage.session.get(_latestConnectHeadersKey);
+      final value = stored[_latestConnectHeadersKey];
+      if (value is Map) {
+        browserHeaders = value.map(
+          (key, value) => MapEntry(key.toString(), value.toString()),
+        );
+        _latestConnectHeaders = browserHeaders;
       }
     }
     final rawHeaders = message['headers'];
