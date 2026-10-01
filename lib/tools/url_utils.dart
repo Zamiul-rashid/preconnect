@@ -13,12 +13,12 @@ String? normalizeMediaUrl(String raw) {
 
   final cleaned = Uri(
     scheme: uri.scheme,
-    userInfo: uri.userInfo,
+    userInfo: uri.userInfo.isEmpty ? null : uri.userInfo,
     host: uri.host,
-    port: uri.port,
+    port: uri.hasPort ? uri.port : null,
     path: uri.path.replaceAll(RegExp(r'[/\\]+$'), ''),
-    query: uri.query,
-    fragment: uri.fragment,
+    query: uri.hasQuery ? uri.query : null,
+    fragment: uri.hasFragment ? uri.fragment : null,
   ).toString();
 
   return cleaned.isEmpty ? null : cleaned;
