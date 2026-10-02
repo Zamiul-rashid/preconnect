@@ -39,7 +39,7 @@ dependencies:
   package_info_plus: ^10.2.1
   device_info_plus: ^13.2.0
   gap: ^3.0.1
-  cupertino_icons: ^1.0.9
+  cupertino_icons: ^2.0.0
   home_widget: ^0.10.0
 
 dev_dependencies:
