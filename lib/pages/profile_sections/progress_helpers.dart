@@ -76,16 +76,16 @@ extension _DegreeProgressPageStateHelpers on _DegreeProgressPageState {
   }) {
     final completedCodes = info.completedCourses
         .where((c) => c.isPassed)
-        .map((c) => c.code.trim().toUpperCase())
+        .map((c) => courseCodeKey(c.code))
         .where((code) => code.isNotEmpty)
         .toSet();
     final inProgressCodes = info.inProgressCourses
-        .map((c) => c.code.trim().toUpperCase())
+        .map((c) => courseCodeKey(c.code))
         .where((code) => code.isNotEmpty)
         .toSet();
     final currentCodes = {
       ...currentSections
-          .map((s) => s.courseCode.trim().toUpperCase())
+          .map((s) => courseCodeKey(s.courseCode))
           .where((code) => code.isNotEmpty),
       ...inProgressCodes,
     };
@@ -93,7 +93,7 @@ extension _DegreeProgressPageStateHelpers on _DegreeProgressPageState {
 
     final wishlist = <_WishlistCourse>[];
     for (final course in info.curriculumCourses) {
-      final code = course.code.trim().toUpperCase();
+      final code = courseCodeKey(course.code);
       if (code.isEmpty) continue;
       if (completedCodes.contains(code) || currentCodes.contains(code)) {
         continue;
@@ -165,7 +165,7 @@ extension _DegreeProgressPageStateHelpers on _DegreeProgressPageState {
         return value;
       }
       index++;
-      return readyCodes.contains(token);
+      return readyCodes.contains(courseCodeKey(token));
     };
 
     return parseExpression();

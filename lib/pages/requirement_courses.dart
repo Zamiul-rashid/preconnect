@@ -68,15 +68,15 @@ class _RequirementCoursesPageState extends State<RequirementCoursesPage> {
   @override
   Widget build(BuildContext context) {
     final completedMap = <String, CompletedCourse>{
-      for (final c in widget.info.completedCourses) c.code.toUpperCase(): c,
+      for (final c in widget.info.completedCourses) courseCodeKey(c.code): c,
     };
     final inProgressCodes = widget.info.inProgressCourses
-        .map((c) => c.code.trim().toUpperCase())
+        .map((c) => courseCodeKey(c.code))
         .where((code) => code.isNotEmpty)
         .toSet();
     final currentSemesterCodes = {
       ...widget.currentSemesterCodes
-          .map((code) => code.trim().toUpperCase())
+          .map(courseCodeKey)
           .where((code) => code.isNotEmpty),
       ...inProgressCodes,
     };
@@ -89,10 +89,12 @@ class _RequirementCoursesPageState extends State<RequirementCoursesPage> {
         if (ap != bp) {
           return ap.compareTo(bp);
         }
-        final aDone = completedMap[aCode]?.isPassed == true;
-        final bDone = completedMap[bCode]?.isPassed == true;
-        final aTop = aDone || currentSemesterCodes.contains(aCode) ? 0 : 1;
-        final bTop = bDone || currentSemesterCodes.contains(bCode) ? 0 : 1;
+        final aKey = courseCodeKey(a.code);
+        final bKey = courseCodeKey(b.code);
+        final aDone = completedMap[aKey]?.isPassed == true;
+        final bDone = completedMap[bKey]?.isPassed == true;
+        final aTop = aDone || currentSemesterCodes.contains(aKey) ? 0 : 1;
+        final bTop = bDone || currentSemesterCodes.contains(bKey) ? 0 : 1;
         if (aTop != bTop) {
           return aTop.compareTo(bTop);
         }
@@ -116,8 +118,9 @@ class _RequirementCoursesPageState extends State<RequirementCoursesPage> {
           }
           final course = courses[index];
           final courseCode = course.code.trim().toUpperCase();
-          final completed = completedMap[courseCode];
-          final takingNow = currentSemesterCodes.contains(courseCode);
+          final courseKey = courseCodeKey(course.code);
+          final completed = completedMap[courseKey];
+          final takingNow = currentSemesterCodes.contains(courseKey);
           final done = completed != null && completed.isPassed;
           final isFailed = completed != null && !completed.isPassed;
           final grade = completed?.grade.trim() ?? '';

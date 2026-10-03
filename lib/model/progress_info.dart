@@ -1,5 +1,14 @@
 import 'package:preconnect/tools/string_utils.dart';
 
+const Map<String, String> _renamedCourseCodes = <String, String>{
+  'EMB101': 'DEV101',
+};
+
+String courseCodeKey(String code) {
+  final normalized = code.trim().toUpperCase();
+  return _renamedCourseCodes[normalized] ?? normalized;
+}
+
 class ProgressInfo {
   ProgressInfo({
     required this.programName,
@@ -192,7 +201,7 @@ class ProgressInfo {
     final map = <String, double>{};
     for (final course in completedCourses) {
       if (!course.isPassed) continue;
-      final key = course.code.toUpperCase();
+      final key = courseCodeKey(course.code);
       final current = map[key] ?? 0;
       if (course.credit > current) {
         map[key] = course.credit;
@@ -210,8 +219,8 @@ class ProgressInfo {
     final byCode = completedCreditByCode;
     final list = headers.map((header) {
       var earned = 0.0;
-      for (final code in header.courseCodes) {
-        earned += byCode[code] ?? 0;
+      for (final key in header.courseCodes.map(courseCodeKey).toSet()) {
+        earned += byCode[key] ?? 0;
       }
       return HeaderProgress(
         title: header.title,
@@ -226,7 +235,7 @@ class ProgressInfo {
   List<CurriculumCourse> get remainingCourses {
     final completed = completedCreditByCode.keys.toSet();
     final list = curriculumCourses
-        .where((course) => !completed.contains(course.code.toUpperCase()))
+        .where((course) => !completed.contains(courseCodeKey(course.code)))
         .toList();
     list.sort((a, b) => compareNaturalText(a.code, b.code));
     return list;
