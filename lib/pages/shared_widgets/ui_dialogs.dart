@@ -649,7 +649,6 @@ Future<T?> showAppSelectDropdown<T>(
                                     Flexible(
                                       child: Text(
                                         option.label,
-                                        overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: textPrimary,
                                           fontSize: optionFontSize,
