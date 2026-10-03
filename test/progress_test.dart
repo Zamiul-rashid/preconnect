@@ -98,6 +98,19 @@ void main() {
       expect(info.completedCredit, 3);
     });
 
+    test('reports the curriculum requirement type for an equivalent code', () {
+      final info = ProgressInfo.fromPayload(
+        _payload(
+          curriculumCodes: const ['DEV101', 'ENG101'],
+          completed: [_course('EMB101')],
+        ),
+      );
+
+      expect(info.mandatoryByCode[courseCodeKey('EMB101')], isTrue);
+      expect(info.mandatoryByCode[courseCodeKey('DEV101')], isTrue);
+      expect(info.mandatoryByCode[courseCodeKey('CSE110')], isNull);
+    });
+
     test('a failed equivalent does not satisfy the requirement', () {
       final info = ProgressInfo.fromPayload(
         _payload(

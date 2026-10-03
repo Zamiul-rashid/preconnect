@@ -322,11 +322,10 @@ class _DegreeProgressPageState extends State<DegreeProgressPage>
           final remainingCredit = (summaryTotal - summaryCompleted)
               .clamp(0, double.infinity)
               .toDouble();
-          final mandatoryByCode = <String, bool>{};
+          final mandatoryByCode = info.mandatoryByCode;
           final courseTitleByCode = <String, String>{};
           for (final c in info.curriculumCourses) {
             final code = c.code.toUpperCase();
-            mandatoryByCode[code] = c.isMandatory;
             final title = c.title.trim();
             if (title.isNotEmpty) {
               courseTitleByCode[code] = title;
@@ -767,7 +766,7 @@ class _DegreeProgressPageState extends State<DegreeProgressPage>
                   const Gap(12),
                   ...currentSectionsVisible.map((current) {
                     final isRequired =
-                        mandatoryByCode[current.courseCode.toUpperCase()] ??
+                        mandatoryByCode[courseCodeKey(current.courseCode)] ??
                         _isLikelyRequired(current.courseType);
                     final rawSubtitle = _resolveCurrentCourseTitle(
                       current,
@@ -941,16 +940,18 @@ class _DegreeProgressPageState extends State<DegreeProgressPage>
                                   Text(
                                     !course.isPassed
                                         ? 'Retake needed'
-                                        : (mandatoryByCode[course.code
-                                                  .toUpperCase()] ??
+                                        : (mandatoryByCode[courseCodeKey(
+                                                course.code,
+                                              )] ??
                                               false)
                                         ? 'Required'
                                         : 'Elective',
                                     style: TextStyle(
                                       color: !course.isPassed
                                           ? AppPalette.danger
-                                          : (mandatoryByCode[course.code
-                                                    .toUpperCase()] ??
+                                          : (mandatoryByCode[courseCodeKey(
+                                                  course.code,
+                                                )] ??
                                                 false)
                                           ? AppPalette.warning
                                           : AppPalette.accent,

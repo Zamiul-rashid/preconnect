@@ -210,6 +210,13 @@ class ProgressInfo {
     return map;
   }
 
+  Map<String, bool> get mandatoryByCode {
+    return <String, bool>{
+      for (final course in curriculumCourses)
+        courseCodeKey(course.code): course.isMandatory,
+    };
+  }
+
   double get completedCredit {
     final creditByCode = completedCreditByCode;
     return creditByCode.values.fold(0.0, (sum, value) => sum + value);

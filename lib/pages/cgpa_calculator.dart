@@ -192,12 +192,12 @@ class _CgpaCalculatorPageState extends State<CgpaCalculatorPage> {
   }
 
   void _buildTitleMap() {
+    _mandatoryByCode.addAll(widget.info.mandatoryByCode);
     for (final course in widget.info.curriculumCourses) {
       final code = course.code.trim().toUpperCase();
       final title = course.title.trim();
       if (code.isEmpty || title.isEmpty) continue;
       _titleByCode[code] = title;
-      _mandatoryByCode[code] = course.isMandatory;
     }
     for (final course in widget.info.completedCourses) {
       final code = course.code.trim().toUpperCase();
@@ -223,8 +223,7 @@ class _CgpaCalculatorPageState extends State<CgpaCalculatorPage> {
           grade: _normalizeImportedGrade(course.grade),
           gradePoint: course.gradePoint,
           semester: course.semesterSession,
-          isRequired:
-              _mandatoryByCode[course.code.trim().toUpperCase()] ?? false,
+          isRequired: _mandatoryByCode[courseCodeKey(course.code)] ?? false,
         ),
       );
     }
@@ -244,7 +243,7 @@ class _CgpaCalculatorPageState extends State<CgpaCalculatorPage> {
           code: code,
           title: title,
           credit: item.courseCredit <= 0 ? '' : '${item.courseCredit}',
-          isRequired: _mandatoryByCode[code] ?? true,
+          isRequired: _mandatoryByCode[courseCodeKey(code)] ?? true,
         ),
       );
     }
@@ -258,7 +257,7 @@ class _CgpaCalculatorPageState extends State<CgpaCalculatorPage> {
           code: code,
           title: title,
           credit: item.credit <= 0 ? '' : '${item.credit}',
-          isRequired: _mandatoryByCode[code] ?? true,
+          isRequired: _mandatoryByCode[courseCodeKey(code)] ?? true,
         ),
       );
     }
