@@ -21,8 +21,11 @@ class RequirementCoursesPage extends StatefulWidget {
   State<RequirementCoursesPage> createState() => _RequirementCoursesPageState();
 }
 
+enum _CourseFilter { all, required, optional }
+
 class _RequirementCoursesPageState extends State<RequirementCoursesPage> {
   final Set<String> _pinnedCodes = <String>{};
+  _CourseFilter _filter = _CourseFilter.all;
 
   String get _pinScope {
     final normalized = widget.headerTitle
@@ -65,6 +68,37 @@ class _RequirementCoursesPageState extends State<RequirementCoursesPage> {
     showAppSnackBar(context, willPin ? '$key pinned to top' : '$key unpinned');
   }
 
+  Future<void> _pickFilter(BuildContext anchorContext) async {
+    final value = await showAppSelectDropdown<_CourseFilter>(
+      anchorContext,
+      title: 'Filter Courses',
+      options: const [
+        AppSelectOption(value: _CourseFilter.all, label: 'All Courses'),
+        AppSelectOption(value: _CourseFilter.required, label: 'Required Only'),
+        AppSelectOption(value: _CourseFilter.optional, label: 'Optional Only'),
+      ],
+      selectedValue: _filter,
+    );
+    if (value == null || !mounted) return;
+    setState(() => _filter = value);
+  }
+
+  bool _matchesFilter(CurriculumCourse course) {
+    return switch (_filter) {
+      _CourseFilter.all => true,
+      _CourseFilter.required => course.isMandatory,
+      _CourseFilter.optional => !course.isMandatory,
+    };
+  }
+
+  String get _emptyMessage {
+    return switch (_filter) {
+      _CourseFilter.all => 'No courses found for this section.',
+      _CourseFilter.required => 'No required courses found for this section.',
+      _CourseFilter.optional => 'No optional courses found for this section.',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final completedMap = <String, CompletedCourse>{
@@ -81,6 +115,7 @@ class _RequirementCoursesPageState extends State<RequirementCoursesPage> {
       ...inProgressCodes,
     };
     final courses = [...widget.info.coursesForHeader(widget.headerTitle)]
+      ..retainWhere(_matchesFilter)
       ..sort((a, b) {
         final aCode = a.code.trim().toUpperCase();
         final bCode = b.code.trim().toUpperCase();
@@ -105,16 +140,24 @@ class _RequirementCoursesPageState extends State<RequirementCoursesPage> {
       title: widget.headerTitle,
       subtitle: 'Requirement Courses',
       icon: Icons.menu_book_outlined,
+      actions: [
+        Builder(
+          builder: (chipContext) => AppSelectChip(
+            icon: Icons.filter_list_rounded,
+            selected: _filter != _CourseFilter.all,
+            compact: true,
+            showArrow: false,
+            showBorder: false,
+            onTap: () => _pickFilter(chipContext),
+          ),
+        ),
+      ],
       body: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         itemCount: courses.isEmpty ? 1 : courses.length,
         itemBuilder: (context, index) {
           if (courses.isEmpty) {
-            return const AppCard(
-              child: AppEmptyState(
-                message: 'No courses found for this section.',
-              ),
-            );
+            return AppCard(child: AppEmptyState(message: _emptyMessage));
           }
           final course = courses[index];
           final courseCode = course.code.trim().toUpperCase();

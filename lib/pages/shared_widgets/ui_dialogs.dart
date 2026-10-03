@@ -646,14 +646,17 @@ Future<T?> showAppSelectDropdown<T>(
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      option.label,
-                                      style: TextStyle(
-                                        color: textPrimary,
-                                        fontSize: optionFontSize,
-                                        fontWeight: selected
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
+                                    Flexible(
+                                      child: Text(
+                                        option.label,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: textPrimary,
+                                          fontSize: optionFontSize,
+                                          fontWeight: selected
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                     if (selected) ...[
